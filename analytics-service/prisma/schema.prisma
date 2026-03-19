@@ -1,0 +1,83 @@
+// Prisma schema — Analytics & Monitoring Service
+// Design principle: store raw event data, compute stats at query time.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Incident Event Log ───────────────────────────────────────────────────────
+model IncidentLog {
+  id                String    @id @default(uuid())
+  incidentId        String    @unique @map("incident_id")
+  type              String
+  status            String    @default("REPORTED")
+  latitude          Float?
+  longitude         Float?
+  region            String?
+  reportedAt        DateTime  @map("reported_at")
+  dispatchedAt      DateTime? @map("dispatched_at")
+  resolvedAt        DateTime? @map("resolved_at")
+  timeToDispatchSec Int?      @map("time_to_dispatch_sec")
+  timeToResolveSec  Int?      @map("time_to_resolve_sec")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt      @map("updated_at")
+
+  @@index([region])
+  @@index([reportedAt])
+  @@index([type])
+  @@map("incident_logs")
+}
+
+// ─── Vehicle Assignment Log ───────────────────────────────────────────────────
+model AssignmentLog {
+  id          String   @id @default(uuid())
+  vehicleId   String   @map("vehicle_id")
+  callSign    String   @map("call_sign")
+  vehicleType String   @map("vehicle_type")
+  incidentId  String   @map("incident_id")
+  assignedAt  DateTime @map("assigned_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([vehicleId])
+  @@index([incidentId])
+  @@index([assignedAt])
+  @@map("assignment_logs")
+}
+
+// ─── Vehicle Location Log ─────────────────────────────────────────────────────
+model LocationLog {
+  id            String   @id @default(uuid())
+  vehicleId     String   @map("vehicle_id")
+  callSign      String   @map("call_sign")
+  vehicleType   String   @map("vehicle_type")
+  vehicleStatus String   @map("vehicle_status")
+  latitude      Float
+  longitude     Float
+  speed         Float?
+  recordedAt    DateTime @map("recorded_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([vehicleId, recordedAt(sort: Desc)])
+  @@index([vehicleStatus])
+  @@map("location_logs")
+}
+
+// ─── Daily Snapshot ───────────────────────────────────────────────────────────
+model DailySnapshot {
+  id                   String   @id @default(uuid())
+  date                 DateTime @unique
+  totalIncidents       Int      @default(0) @map("total_incidents")
+  resolvedIncidents    Int      @default(0) @map("resolved_incidents")
+  avgTimeToDispatchSec Int?     @map("avg_time_to_dispatch_sec")
+  avgTimeToResolveSec  Int?     @map("avg_time_to_resolve_sec")
+  vehicleDeployments   Int      @default(0) @map("vehicle_deployments")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt      @map("updated_at")
+
+  @@map("daily_snapshots")
+}

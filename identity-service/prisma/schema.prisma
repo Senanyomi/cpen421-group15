@@ -1,0 +1,61 @@
+// ─── Prisma Schema — Identity & Auth Service ──────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── User ─────────────────────────────────────────────────────────────────────
+model User {
+  id           String        @id @default(uuid())
+  name         String
+  email        String        @unique
+  password     String        // bcrypt hash — never store plain text
+  role         Role          @default(OPERATOR)
+  isActive     Boolean       @default(true)   @map("is_active")
+  createdAt    DateTime      @default(now())  @map("created_at")
+  updatedAt    DateTime      @updatedAt       @map("updated_at")
+
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+// ─── Refresh Token ────────────────────────────────────────────────────────────
+// Stored in DB so we can revoke them on logout
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+// ─── Password Reset Token ─────────────────────────────────────────────────────
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")  // marked when consumed
+  createdAt DateTime @default(now())  @map("created_at")
+
+  @@map("password_reset_tokens")
+}
+
+// ─── Roles ────────────────────────────────────────────────────────────────────
+enum Role {
+  ADMIN        // full system access
+  DISPATCHER   // can assign responders
+  OPERATOR     // can create & update incidents
+  RESPONDER    // field unit
+  ANALYST      // read-only, analytics access
+}

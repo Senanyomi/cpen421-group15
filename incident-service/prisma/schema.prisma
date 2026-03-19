@@ -1,0 +1,92 @@
+// Prisma schema — Emergency Incident Service
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Incident ─────────────────────────────────────────────────────────────────
+model Incident {
+  id                String         @id @default(uuid())
+  type              IncidentType
+  description       String
+  latitude          Float
+  longitude         Float
+  status            IncidentStatus @default(REPORTED)
+  assignedVehicleId String?        @map("assigned_vehicle_id")  // links to Dispatch Service
+  reportedBy        String         @map("reported_by")          // userId from Identity Service
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt      @map("updated_at")
+  resolvedAt        DateTime?      @map("resolved_at")
+
+  notes             IncidentNote[]
+
+  @@map("incidents")
+}
+
+// ─── Incident Notes ───────────────────────────────────────────────────────────
+model IncidentNote {
+  id         String   @id @default(uuid())
+  incidentId String   @map("incident_id")
+  authorId   String   @map("author_id")   // userId from Identity Service
+  content    String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@map("incident_notes")
+}
+
+// ─── Mock Responder ───────────────────────────────────────────────────────────
+// Stores basic responder positions so the nearest-responder endpoint works
+// without needing a live call to the Dispatch Service.
+model Responder {
+  id          String          @id @default(uuid())
+  name        String
+  type        ResponderType
+  status      ResponderStatus @default(AVAILABLE)
+  latitude    Float
+  longitude   Float
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt      @map("updated_at")
+
+  @@map("responders")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+enum IncidentType {
+  FIRE
+  MEDICAL
+  POLICE
+  NATURAL_DISASTER
+  HAZMAT
+  TRAFFIC
+  OTHER
+}
+
+enum IncidentStatus {
+  REPORTED      // just came in — nobody has acted yet
+  ACKNOWLEDGED  // dispatcher has seen it
+  DISPATCHED    // a responder has been assigned and is on the way
+  IN_PROGRESS   // responder is on scene
+  RESOLVED      // incident handled
+  CLOSED        // fully closed and archived
+}
+
+enum ResponderType {
+  FIRE_TRUCK
+  AMBULANCE
+  POLICE_CAR
+  HAZMAT_UNIT
+  RESCUE_TEAM
+}
+
+enum ResponderStatus {
+  AVAILABLE
+  BUSY
+  OFFLINE
+}

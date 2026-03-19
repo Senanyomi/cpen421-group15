@@ -1,0 +1,14 @@
+{
+  "name": "nerdcp-rabbitmq-setup",
+  "version": "1.0.0",
+  "description": "Shared RabbitMQ connection, publisher and consumer utilities for NERDCP",
+  "main": "src/index.js",
+  "scripts": {
+    "example:publisher": "node examples/publisher.example.js",
+    "example:consumer":  "node examples/consumer.example.js"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.3",
+    "dotenv":  "^16.3.1"
+  }
+}
