@@ -8,7 +8,7 @@ const isNumber = (v) => typeof v === 'number' && isFinite(v);
 
 // ─── Create Incident ──────────────────────────────────────────────────────────
 const validateCreateIncident = (body) => {
-  const { type, description, latitude, longitude } = body;
+  const { type, description, latitude, longitude, citizenName } = body;
 
   if (isEmpty(type))        return { valid: false, message: 'type is required.' };
   if (!VALID_TYPES.includes(type)) {
@@ -17,6 +17,13 @@ const validateCreateIncident = (body) => {
   if (isEmpty(description)) return { valid: false, message: 'description is required.' };
   if (description.trim().length < 10) {
     return { valid: false, message: 'description must be at least 10 characters.' };
+  }
+  if (isEmpty(citizenName)) return { valid: false, message: 'citizenName is required.' };
+  if (citizenName.trim().length < 2) {
+    return { valid: false, message: 'citizenName must be at least 2 characters.' };
+  }
+  if (citizenName.trim().length > 100) {
+    return { valid: false, message: 'citizenName must not exceed 100 characters.' };
   }
   if (latitude === undefined || latitude === null) return { valid: false, message: 'latitude is required.' };
   if (longitude === undefined || longitude === null) return { valid: false, message: 'longitude is required.' };
