@@ -5,5 +5,4 @@ README.md
 .env.example
 .eslintrc
 .prettierrc
-src
 prisma
