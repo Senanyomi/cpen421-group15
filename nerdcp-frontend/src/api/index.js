@@ -22,7 +22,7 @@ const URLS = {
 }
 
 // ─── 2. AXIOS INSTANCE FACTORY ────────────────────────────────────────────────
-// Every microservice gets its own Axios instance sharing the same interceptors.
+// Every microservice gets its own Axios instance with request/response interceptors.
 const createClient = (baseURL) => {
   const client = axios.create({
     baseURL,
@@ -42,23 +42,44 @@ const createClient = (baseURL) => {
     (error) => Promise.reject(error)
   )
 
-  // ── RESPONSE INTERCEPTOR: global error handling ────────────────────────────
+  // ── RESPONSE INTERCEPTOR: global error handling + token refresh ────────────────────────────
   client.interceptors.response.use(
     // Success — return the response as-is
     (response) => response,
 
     // Error — normalize and handle globally
-    (error) => {
+    async (error) => {
       const status  = error.response?.status
       const message = error.response?.data?.message || error.message || 'Request failed'
+      const originalRequest = error.config
 
-      // 401 Unauthorized — token expired or invalid, force re-login
-      if (status === 401) {
-        localStorage.removeItem('nerdcp_token')
-        localStorage.removeItem('nerdcp_user')
-        localStorage.removeItem('nerdcp_refresh')
-        window.location.href = '/login'
-        return Promise.reject(new Error('Session expired. Please log in again.'))
+      // 401 Unauthorized — try to refresh token before giving up
+      if (status === 401 && !originalRequest._retry) {
+        originalRequest._retry = true
+        
+        try {
+          const refreshToken = localStorage.getItem('nerdcp_refresh')
+          if (!refreshToken) throw new Error('No refresh token available')
+          
+          // Use raw axios (bypass interceptors) to refresh tokens
+          const refreshRes = await axios.post(`${URLS.identity}/auth/refresh-token`, { refreshToken })
+          const { accessToken, refreshToken: newRefreshToken } = refreshRes.data.data
+          
+          // Update stored tokens
+          localStorage.setItem('nerdcp_token', accessToken)
+          localStorage.setItem('nerdcp_refresh', newRefreshToken)
+          
+          // Retry original request with new token
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`
+          return client(originalRequest)
+        } catch (refreshErr) {
+          // Refresh failed — clear tokens and redirect to login
+          localStorage.removeItem('nerdcp_token')
+          localStorage.removeItem('nerdcp_user')
+          localStorage.removeItem('nerdcp_refresh')
+          window.location.href = '/login'
+          return Promise.reject(new Error('Session expired. Please log in again.'))
+        }
       }
 
       // 403 Forbidden — user doesn't have the right role
