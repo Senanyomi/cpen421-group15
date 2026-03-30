@@ -27,13 +27,14 @@ const assertValidTransition = (current, next) => {
 };
 
 // ─── Create Incident ──────────────────────────────────────────────────────────
-const createIncident = async ({ type, description, latitude, longitude }, reportedBy) => {
+const createIncident = async ({ type, description, latitude, longitude, citizenName }, reportedBy) => {
   const incident = await prisma.incident.create({
     data: {
       type,
       description: description.trim(),
       latitude:  parseFloat(latitude),
       longitude: parseFloat(longitude),
+      citizenName: citizenName.trim(),
       reportedBy,
       status: 'REPORTED',
     },
@@ -46,6 +47,7 @@ const createIncident = async ({ type, description, latitude, longitude }, report
     status:      incident.status,
     latitude:    incident.latitude,
     longitude:   incident.longitude,
+    citizenName: incident.citizenName,
     reportedBy:  incident.reportedBy,
   });
 
