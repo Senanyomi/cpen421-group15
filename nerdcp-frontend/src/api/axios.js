@@ -23,15 +23,40 @@ const createClient = (baseURL) => {
     return config
   })
 
-  // Global error handling — redirect to login on 401
+  // Global error handling + automatic token refresh on 401
   client.interceptors.response.use(
     (res) => res,
-    (err) => {
-      if (err.response?.status === 401) {
-        localStorage.removeItem('nerdcp_token')
-        localStorage.removeItem('nerdcp_user')
-        window.location.href = '/login'
+    async (err) => {
+      const originalRequest = err.config
+      
+      if (err.response?.status === 401 && !originalRequest._retry) {
+        originalRequest._retry = true
+        
+        try {
+          const refreshToken = localStorage.getItem('nerdcp_refresh')
+          if (!refreshToken) throw new Error('No refresh token available')
+          
+          // Use the identity service directly to refresh tokens
+          const res = await axios.post(`${SERVICES.identity}/auth/refresh-token`, { refreshToken })
+          const { accessToken, refreshToken: newRefreshToken } = res.data.data
+          
+          // Update stored tokens
+          localStorage.setItem('nerdcp_token', accessToken)
+          localStorage.setItem('nerdcp_refresh', newRefreshToken)
+          
+          // Retry original request with new token
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`
+          return client(originalRequest)
+        } catch (refreshErr) {
+          // Refresh failed — clear tokens and redirect to login
+          localStorage.removeItem('nerdcp_token')
+          localStorage.removeItem('nerdcp_refresh')
+          localStorage.removeItem('nerdcp_user')
+          window.location.href = '/login'
+          return Promise.reject(refreshErr)
+        }
       }
+      
       return Promise.reject(err)
     }
   )
