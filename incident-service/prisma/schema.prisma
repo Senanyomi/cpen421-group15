@@ -19,6 +19,7 @@ model Incident {
   status            IncidentStatus @default(REPORTED)
   assignedVehicleId String?        @map("assigned_vehicle_id")  // links to Dispatch Service
   reportedBy        String         @map("reported_by")          // userId from Identity Service
+  citizenName       String         @map("citizen_name")         // name of the citizen reporting
   createdAt         DateTime       @default(now()) @map("created_at")
   updatedAt         DateTime       @updatedAt      @map("updated_at")
   resolvedAt        DateTime?      @map("resolved_at")
