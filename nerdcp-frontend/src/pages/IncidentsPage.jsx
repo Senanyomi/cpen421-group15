@@ -140,7 +140,7 @@ function Toast({ message, type = 'success', onClose }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 function CreateIncidentPanel({ onCreated, onClose }) {
   const [form, setForm] = useState({
-    type: 'FIRE', description: '', latitude: '', longitude: '',
+    type: 'FIRE', description: '', latitude: '', longitude: '', citizenName: '',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
@@ -148,6 +148,8 @@ function CreateIncidentPanel({ onCreated, onClose }) {
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const validate = () => {
+    if (!form.citizenName.trim() || form.citizenName.trim().length < 2)
+      return 'Citizen name must be at least 2 characters.'
     if (!form.description.trim() || form.description.trim().length < 10)
       return 'Description must be at least 10 characters.'
     if (!form.latitude || isNaN(form.latitude))  return 'Valid latitude is required.'
@@ -168,6 +170,7 @@ function CreateIncidentPanel({ onCreated, onClose }) {
         description: form.description.trim(),
         latitude:    parseFloat(form.latitude),
         longitude:   parseFloat(form.longitude),
+        citizenName: form.citizenName.trim(),
       })
       onCreated(res.data.data)
     } catch (e) {
@@ -222,6 +225,17 @@ function CreateIncidentPanel({ onCreated, onClose }) {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Citizen Name */}
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label style={STYLES.label}>CITIZEN NAME *</label>
+            <input
+              type="text" placeholder="Full name of person reporting"
+              value={form.citizenName}
+              onChange={e => set('citizenName', e.target.value)}
+              style={STYLES.input}
+            />
           </div>
 
           {/* Latitude */}
@@ -360,6 +374,14 @@ function IncidentDrawer({ incident, onClose, onUpdated }) {
         <div style={{ flex: 1, overflow: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
           {error && <div style={STYLES.errorBanner}>⚠ {error}</div>}
+
+          {/* Citizen Name */}
+          <section>
+            <div style={STYLES.sectionLabel}>REPORTED BY</div>
+            <p style={{ color: '#c9d1d9', fontSize: 14 }}>
+              {localIncident.citizenName || 'Anonymous'}
+            </p>
+          </section>
 
           {/* Description */}
           <section>
