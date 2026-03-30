@@ -17,8 +17,10 @@ const PORT = process.env.PORT || 3004;
 app.use(cors({
   origin: [
     'http://localhost:5173',
-    'https://cpen421-group15.vercel.app',
+    'https://cpen421-group15.vercel.app/',
   ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 }))
 app.use(express.json());
