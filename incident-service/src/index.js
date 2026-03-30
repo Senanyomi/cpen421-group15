@@ -19,7 +19,7 @@ const PORT = process.env.PORT || 3002;
 app.use(cors({
   origin: [
     'http://localhost:5173',
-    'https://cpen421-group15.vercel.app',
+    'https://cpen421-group15.vercel.app/',
   ],
   credentials: true,
 }))
