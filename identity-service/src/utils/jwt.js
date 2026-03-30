@@ -25,8 +25,23 @@ const verifyRefreshToken = (token) => {
 
 // ─── Calculate expiry Date for DB storage ────────────────────────────────────
 const getRefreshTokenExpiry = () => {
-  const days = parseInt((process.env.JWT_REFRESH_EXPIRES_IN || '7d').replace('d', ''));
-  return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+  const expiresIn = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
+  
+  // Parse the JWT expiry format (e.g., "7d", "7h", "3m", "3600s")
+  const match = expiresIn.match(/^(\d+)([dhms])$/);
+  if (!match) {
+    throw new Error(`Invalid JWT_REFRESH_EXPIRES_IN format: ${expiresIn}. Expected format: "7d", "24h", "3600s", etc.`);
+  }
+  
+  const [, amount, unit] = match;
+  const ms = {
+    d: 24 * 60 * 60 * 1000,
+    h: 60 * 60 * 1000,
+    m: 60 * 1000,
+    s: 1000,
+  }[unit];
+  
+  return new Date(Date.now() + parseInt(amount) * ms);
 };
 
 module.exports = {
