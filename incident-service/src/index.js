@@ -20,7 +20,6 @@ app.use(cors({
   origin: [
     'http://localhost:5173',
     'https://cpen421-group15.vercel.app',
-    'https://nerdcp-incident-service.onrender.com'
   ],
   credentials: true,
 }))
