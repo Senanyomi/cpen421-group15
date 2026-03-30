@@ -14,7 +14,13 @@ const app  = express();
 const PORT = process.env.PORT || 3004;
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
-app.use(cors());
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    'https://cpen421-group15.vercel.app',
+  ],
+  credentials: true,
+}))
 app.use(express.json());
 app.use(morgan('combined', { stream: { write: (msg) => logger.info(msg.trim()) } }));
 
