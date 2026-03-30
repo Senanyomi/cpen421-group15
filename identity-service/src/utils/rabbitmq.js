@@ -3,31 +3,55 @@ const amqp = require('amqplib');
 const logger = require('./logger');
 
 const EXCHANGE = 'nerdcp.events';
+
 let channel = null;
+let connection = null;
 
 const connectRabbitMQ = async () => {
+  const url = process.env.RABBITMQ_URL || 'amqp://guest:guest@localhost:5672';
+
   try {
-    const conn = await amqp.connect(process.env.RABBITMQ_URL || 'amqp://localhost');
-    channel = await conn.createChannel();
+    connection = await amqp.connect(url);
+    channel = await connection.createChannel();
+
     await channel.assertExchange(EXCHANGE, 'topic', { durable: true });
+
     logger.info('RabbitMQ connected');
 
-    conn.on('error', (e) => logger.error('RabbitMQ error', e.message));
-    conn.on('close', () => {
+    connection.on('error', (err) => {
+      logger.error('RabbitMQ connection error', err.message);
+    });
+
+    connection.on('close', () => {
       logger.warn('RabbitMQ disconnected — retrying in 5s');
+      channel = null;
       setTimeout(connectRabbitMQ, 5000);
     });
+
   } catch (err) {
     logger.warn(`RabbitMQ unavailable (${err.message}) — retrying in 5s`);
     setTimeout(connectRabbitMQ, 5000);
   }
 };
 
-const publishEvent = (routingKey, payload) => {
-  if (!channel) return;
+const publishEvent = async (routingKey, payload) => {
+  if (!channel) {
+    logger.warn('Cannot publish event — RabbitMQ not connected');
+    return;
+  }
+
   try {
-    const msg = Buffer.from(JSON.stringify({ ...payload, timestamp: new Date() }));
-    channel.publish(EXCHANGE, routingKey, msg, { persistent: true });
+    const message = Buffer.from(
+      JSON.stringify({
+        ...payload,
+        timestamp: new Date().toISOString(),
+      })
+    );
+
+    channel.publish(EXCHANGE, routingKey, message, {
+      persistent: true,
+    });
+
     logger.info(`Event published → ${routingKey}`);
   } catch (err) {
     logger.error('Failed to publish event', err.message);

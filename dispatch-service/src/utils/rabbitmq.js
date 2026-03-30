@@ -1,91 +1,68 @@
 // src/utils/rabbitmq.js
-const amqp   = require('amqplib');
+const amqp = require('amqplib');
 const logger = require('./logger');
 
-const EXCHANGE  = 'nerdcp.events';
-const QUEUE     = 'dispatch.service.queue';
-let channel     = null;
+const EXCHANGE = 'nerdcp.events';
+const QUEUE = 'analytics.queue'; // change per service
 
-// ─── Connect ──────────────────────────────────────────────────────────────────
-const connectRabbitMQ = async () => {
+let channel = null;
+let connection = null;
+
+const connectRabbitMQ = async (routingKeys = []) => {
+  const url = process.env.RABBITMQ_URL || 'amqp://guest:guest@localhost:5672';
+
   try {
-    const conn = await amqp.connect(process.env.RABBITMQ_URL || 'amqp://localhost');
-    channel    = await conn.createChannel();
+    connection = await amqp.connect(url);
+    channel = await connection.createChannel();
 
     await channel.assertExchange(EXCHANGE, 'topic', { durable: true });
 
-    // This service CONSUMES incident events and PUBLISHES vehicle events
-    const { queue } = await channel.assertQueue(QUEUE, { durable: true });
-    await channel.bindQueue(queue, EXCHANGE, 'incident.created');
-    await channel.bindQueue(queue, EXCHANGE, 'incident.status_updated');
+    const q = await channel.assertQueue(QUEUE, { durable: true });
 
-    channel.prefetch(1); // process one message at a time
-    channel.consume(queue, handleIncomingMessage, { noAck: false });
+    // Bind routing keys
+    for (const key of routingKeys) {
+      await channel.bindQueue(q.queue, EXCHANGE, key);
+    }
 
-    logger.info('RabbitMQ connected — listening on dispatch.service.queue');
+    logger.info('RabbitMQ connected (Consumer ready)');
 
-    conn.on('error', (e) => logger.error('RabbitMQ error', e.message));
-    conn.on('close', () => {
+    connection.on('error', (err) => {
+      logger.error('RabbitMQ connection error', err.message);
+    });
+
+    connection.on('close', () => {
       logger.warn('RabbitMQ disconnected — retrying in 5s');
       channel = null;
-      setTimeout(connectRabbitMQ, 5000);
+      setTimeout(() => connectRabbitMQ(routingKeys), 5000);
     });
+
   } catch (err) {
     logger.warn(`RabbitMQ unavailable (${err.message}) — retrying in 5s`);
-    setTimeout(connectRabbitMQ, 5000);
+    setTimeout(() => connectRabbitMQ(routingKeys), 5000);
   }
 };
 
-// ─── Incoming message router ──────────────────────────────────────────────────
-const handleIncomingMessage = async (msg) => {
-  if (!msg) return;
-  try {
-    const payload    = JSON.parse(msg.content.toString());
-    const routingKey = msg.fields.routingKey;
-
-    logger.info(`Event received ← ${routingKey}`);
-
-    if (routingKey === 'incident.created') {
-      logger.info(`New incident queued for dispatch: ${payload.incidentId} [${payload.type}]`);
-      // Dispatcher will use POST /vehicles/:id/assign to act on this
-    }
-
-    if (routingKey === 'incident.status_updated') {
-      // If an incident is CLOSED, auto-complete active assignments for it
-      if (['RESOLVED', 'CLOSED'].includes(payload.newStatus)) {
-        const prisma = require('./prisma');
-        const updated = await prisma.vehicleAssignment.updateMany({
-          where:  { incidentId: payload.incidentId, status: 'ACTIVE' },
-          data:   { status: 'COMPLETED', completedAt: new Date() },
-        });
-        if (updated.count > 0) {
-          logger.info(`Auto-completed ${updated.count} assignment(s) for incident ${payload.incidentId}`);
-        }
-      }
-    }
-
-    channel.ack(msg);
-  } catch (err) {
-    logger.error('Failed to process message', err.message);
-    channel.nack(msg, false, false); // discard — don't requeue poison messages
-  }
-};
-
-// ─── Publish ──────────────────────────────────────────────────────────────────
-const publishEvent = (routingKey, payload) => {
+const consumeEvents = (handler) => {
   if (!channel) {
-    logger.warn(`Cannot publish "${routingKey}" — RabbitMQ not ready`);
+    logger.warn('Cannot consume — RabbitMQ not connected');
     return;
   }
-  try {
-    const msg = Buffer.from(
-      JSON.stringify({ ...payload, source: 'dispatch-service', timestamp: new Date().toISOString() })
-    );
-    channel.publish(EXCHANGE, routingKey, msg, { persistent: true });
-    logger.info(`Event published → ${routingKey}`);
-  } catch (err) {
-    logger.error('Failed to publish event', err.message);
-  }
+
+  channel.consume(QUEUE, (msg) => {
+    if (msg) {
+      try {
+        const data = JSON.parse(msg.content.toString());
+        handler(data);
+
+        channel.ack(msg);
+      } catch (err) {
+        logger.error('Error processing message', err.message);
+        channel.nack(msg);
+      }
+    }
+  });
+
+  logger.info(`Listening for events on ${QUEUE}`);
 };
 
-module.exports = { connectRabbitMQ, publishEvent };
+module.exports = { connectRabbitMQ, consumeEvents };
