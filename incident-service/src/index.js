@@ -2,9 +2,8 @@
 require('dotenv').config();
 
 const express  = require('express');
-const cors     = require('morgan');
+const cors     = require('cors');
 const morgan   = require('morgan');
-const corsMiddleware = require('cors');
 
 const incidentRoutes  = require('./routes/incident.routes');
 const responderRoutes = require('./routes/responder.routes');

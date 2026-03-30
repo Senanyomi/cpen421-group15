@@ -14,24 +14,9 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import api from '../api'
 
-// ─── CONFIG ───────────────────────────────────────────────────────────────────
-const BASE_URL =
-  typeof import.meta !== 'undefined' && import.meta.env?.VITE_ANALYTICS_URL
-    ? import.meta.env.VITE_ANALYTICS_URL
-    : 'http://localhost:3004'
-
-// ─── HTTP ─────────────────────────────────────────────────────────────────────
-const getToken = () => localStorage.getItem('nerdcp_token') || ''
-
-const http = async (path) => {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { Authorization: `Bearer ${getToken()}` },
-  })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data?.message || `Error ${res.status}`)
-  return data
-}
+// Note: All API calls now use centralized service with automatic token refresh interceptor
 
 // ─── MOCK DATA — used when API returns no data yet ────────────────────────────
 const MOCK_RESPONSE_TIMES = {
@@ -338,10 +323,13 @@ export default function AnalyticsPage() {
   const fetchResponseTimes = useCallback(async () => {
     setLoadingRT(true); setErrorRT('')
     try {
-      const data = await http(`/analytics/response-times${buildParams()}`)
-      setResponseTimes(data.data?.totalIncidents ? data.data : MOCK_RESPONSE_TIMES)
+      const queryStr = buildParams().slice(1) // remove leading '?'
+      const params = Object.fromEntries(new URLSearchParams(queryStr))
+      const res = await api.analytics.responseTimes(params)
+      const data = res?.data?.data || res?.data
+      setResponseTimes(data?.totalIncidents ? data : MOCK_RESPONSE_TIMES)
     } catch {
-      setResponseTimes(MOCK_RESPONSE_TIMES) // show mock on error
+      setResponseTimes(MOCK_RESPONSE_TIMES)
       setErrorRT('Using sample data — connect to analytics-service to see live data.')
     } finally { setLoadingRT(false) }
   }, [buildParams])
@@ -349,8 +337,11 @@ export default function AnalyticsPage() {
   const fetchByRegion = useCallback(async () => {
     setLoadingReg(true); setErrorReg('')
     try {
-      const data = await http(`/analytics/incidents-by-region${buildParams()}`)
-      setByRegion(data.data?.grandTotal ? data.data : MOCK_BY_REGION)
+      const queryStr = buildParams().slice(1)
+      const params = Object.fromEntries(new URLSearchParams(queryStr))
+      const res = await api.analytics.byRegion(params)
+      const data = res?.data?.data || res?.data
+      setByRegion(data?.grandTotal ? data : MOCK_BY_REGION)
     } catch {
       setByRegion(MOCK_BY_REGION)
       setErrorReg('Using sample data — connect to analytics-service to see live data.')
@@ -360,8 +351,11 @@ export default function AnalyticsPage() {
   const fetchUtilization = useCallback(async () => {
     setLoadingUtil(true); setErrorUtil('')
     try {
-      const data = await http(`/analytics/resource-utilization${buildParams()}`)
-      setUtilization(data.data?.totalDeployments ? data.data : MOCK_UTILIZATION)
+      const queryStr = buildParams().slice(1)
+      const params = Object.fromEntries(new URLSearchParams(queryStr))
+      const res = await api.analytics.utilization(params)
+      const data = res?.data?.data || res?.data
+      setUtilization(data?.totalDeployments ? data : MOCK_UTILIZATION)
     } catch {
       setUtilization(MOCK_UTILIZATION)
       setErrorUtil('Using sample data — connect to analytics-service to see live data.')

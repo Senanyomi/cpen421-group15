@@ -38,7 +38,16 @@ export default function LoginPage() {
     try {
       const res = await api.auth.login(email, password)
       const { accessToken, refreshToken, user } = res.data.data
-      if (refreshToken) localStorage.setItem('nerdcp_refresh', refreshToken)
+      
+      // Validate that both tokens were received
+      if (!accessToken) throw new Error('Server did not return access token')
+      if (!refreshToken) throw new Error('Server did not return refresh token')
+      if (!user) throw new Error('Server did not return user data')
+      
+      // Store both tokens
+      localStorage.setItem('nerdcp_token', accessToken)
+      localStorage.setItem('nerdcp_refresh', refreshToken)
+      
       login(accessToken, user)
       navigate('/', { replace: true })
     } catch (err) {

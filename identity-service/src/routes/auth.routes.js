@@ -9,7 +9,9 @@ const { authLimiter } = require('../middleware/rateLimiter.middleware');
 // ─── Public (no token needed) ─────────────────────────────────────────────────
 router.post('/register',       authLimiter, ctrl.register);
 router.post('/login',          authLimiter, ctrl.login);
-router.post('/refresh-token',  authLimiter, ctrl.refreshToken);
+
+// Refresh token — NO rate limiting (called automatically during token expiry)
+router.post('/refresh-token',  ctrl.refreshToken);
 
 // Two-step password reset — also public (user isn't logged in when they forget their password)
 router.post('/reset-password',         authLimiter, ctrl.resetPasswordRequest);

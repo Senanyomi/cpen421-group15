@@ -13,28 +13,11 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import api from '../api'
 
-// ─── CONFIG ───────────────────────────────────────────────────────────────────
-const BASE_URL =
-  typeof import.meta !== 'undefined' && import.meta.env?.VITE_DISPATCH_URL
-    ? import.meta.env.VITE_DISPATCH_URL
-    : 'http://localhost:3003'
+// Note: All API calls now use centralized service with automatic token refresh interceptor
 
 const POLL_INTERVAL_MS = 15_000 // refresh fleet every 15 s
-
-// ─── HTTP HELPER ──────────────────────────────────────────────────────────────
-const getToken = () => localStorage.getItem('nerdcp_token') || ''
-
-const http = async (path) => {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { Authorization: `Bearer ${getToken()}` },
-  })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data?.message || `Error ${res.status}`)
-  return data
-}
-
-const apiError = (err) => err?.message || 'Unexpected error.'
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const VEHICLE_META = {
@@ -233,10 +216,11 @@ function VehicleDetail({ vehicle, onClose }) {
     if (vehicle.status === 'OFFLINE') return
     setLoadingLoc(true); setLocError('')
     try {
-      const data = await http(`/vehicles/${vehicle.id}/location`)
-      setLiveLocation(data.data)
+      const res = await api.vehicles.location(vehicle.id)
+      const locationData = res?.data?.data || res?.data
+      setLiveLocation(locationData)
     } catch (e) {
-      setLocError(apiError(e))
+      setLocError(e?.message || 'Failed to fetch location')
     } finally {
       setLoadingLoc(false)
     }
@@ -384,14 +368,17 @@ export default function VehiclesPage() {
     if (!silent) setLoading(true)
     setError('')
     try {
-      const params = new URLSearchParams({ limit: 100 })
-      if (filterStatus) params.set('status', filterStatus)
-      if (filterType)   params.set('type', filterType)
-      const data = await http(`/vehicles?${params}`)
-      setVehicles(data.data || [])
+      const params = {}
+      if (filterStatus) params.status = filterStatus
+      if (filterType)   params.type = filterType
+      const res = await api.vehicles.list({ ...params, limit: 100 })
+      // Extract vehicles array from response
+      const vehicles = res?.data?.data || res?.data || []
+      setVehicles(Array.isArray(vehicles) ? vehicles : [])
       setLastRefresh(new Date())
     } catch (e) {
-      setError(apiError(e))
+      setError(e?.message || 'Failed to load vehicles')
+      setVehicles([])
     } finally {
       setLoading(false)
     }

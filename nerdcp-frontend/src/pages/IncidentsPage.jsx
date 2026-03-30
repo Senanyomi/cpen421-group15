@@ -17,31 +17,9 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import api, { apiError } from '../api'
 
-// ─── CONFIG ───────────────────────────────────────────────────────────────────
-const BASE_URL =
-  typeof import.meta !== 'undefined' && import.meta.env?.VITE_INCIDENT_URL
-    ? import.meta.env.VITE_INCIDENT_URL
-    : 'http://localhost:3002'
-
-// ─── HTTP HELPER ──────────────────────────────────────────────────────────────
-const getToken = () => localStorage.getItem('nerdcp_token') || ''
-
-const http = async (method, path, body) => {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${getToken()}`,
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data?.message || `Request failed (${res.status})`)
-  return data
-}
-
-const apiError = (err) => err?.message || 'An unexpected error occurred.'
+// Note: All API calls now use centralized service with automatic token refresh interceptor
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const INCIDENT_TYPES = ['FIRE', 'MEDICAL', 'POLICE', 'NATURAL_DISASTER', 'HAZMAT', 'TRAFFIC', 'OTHER']
@@ -185,13 +163,13 @@ function CreateIncidentPanel({ onCreated, onClose }) {
     if (err) { setError(err); return }
     setLoading(true); setError('')
     try {
-      const data = await http('POST', '/incidents', {
+      const res = await api.incidents.create({
         type:        form.type,
         description: form.description.trim(),
         latitude:    parseFloat(form.latitude),
         longitude:   parseFloat(form.longitude),
       })
-      onCreated(data.data)
+      onCreated(res.data.data)
     } catch (e) {
       setError(apiError(e))
     } finally {
@@ -309,7 +287,7 @@ function IncidentDrawer({ incident, onClose, onUpdated }) {
   const updateStatus = async (status) => {
     setStatusLoading(true); setError('')
     try {
-      const res = await http('PUT', `/incidents/${localIncident.id}/status`, { status })
+      const res = await api.incidents.updateStatus(localIncident.id, status)
       setLocal(res.data)
       onUpdated(res.data)
     } catch (e) {
@@ -324,9 +302,7 @@ function IncidentDrawer({ incident, onClose, onUpdated }) {
     if (!vehicleId.trim()) { setError('Vehicle ID is required.'); return }
     setAssignLoading(true); setError('')
     try {
-      const res = await http('PUT', `/incidents/${localIncident.id}/assign`, {
-        assignedVehicleId: vehicleId.trim()
-      })
+      const res = await api.incidents.assign(localIncident.id, vehicleId.trim())
       setLocal(res.data)
       onUpdated(res.data)
       setError('')
@@ -518,11 +494,15 @@ export default function IncidentsPage() {
       const params = new URLSearchParams({ page, limit: 15 })
       if (filterStatus) params.set('status', filterStatus)
       if (filterType)   params.set('type', filterType)
-      const data = await http('GET', `/incidents?${params}`)
-      setIncidents(data.data)
-      setTotalPages(data.pagination?.pages || 1)
+      const query = new URLSearchParams(params).toString()
+      const res = await api.incidents.list(Object.fromEntries(new URLSearchParams(query)))
+      // Extract incidents array from response - handle both { data: [] } and { data: { data: [] } }
+      const incidents = res?.data?.data || res?.data || []
+      setIncidents(Array.isArray(incidents) ? incidents : [])
+      setTotalPages(res?.pagination?.pages || 1)
     } catch (e) {
       setError(apiError(e))
+      setIncidents([])
     } finally {
       setLoading(false)
     }
