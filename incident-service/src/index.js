@@ -1,4 +1,3 @@
-// src/index.js — Emergency Incident Service entry point
 require('dotenv').config();
 
 const express  = require('express');
@@ -29,6 +28,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('combined', { stream: { write: (msg) => logger.info(msg.trim()) } }));
 
+const swaggerUi = require('swagger-ui-express');
+const swaggerDocument = require('./swagger');
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
 // ─── Health Check ─────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
   res.json({
@@ -57,6 +61,7 @@ const start = async () => {
 
   app.listen(PORT, () => {
     logger.info(`Incident Service v3 running on http://localhost:${PORT}`);
+    logger.info(`Swagger docs: http://localhost:${PORT}/api-docs`);
     logger.info('Endpoints:');
     logger.info('  POST   /incidents');
     logger.info('  GET    /incidents');

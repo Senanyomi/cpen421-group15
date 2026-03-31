@@ -1,4 +1,3 @@
-// src/index.js — Identity & Authentication Service entry point
 require('dotenv').config();
 
 const express = require('express');
@@ -31,6 +30,11 @@ app.use(express.urlencoded({ extended: true }));
 app.use(morgan('combined', { stream: { write: (msg) => logger.info(msg.trim()) } }));
 app.use(apiLimiter);
 
+const swaggerUi = require('swagger-ui-express');
+const swaggerDocument = require('./swagger');
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
 // ─── Health Check ─────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
   res.json({
@@ -59,6 +63,7 @@ const start = async () => {
 
   app.listen(PORT, () => {
     logger.info(`Identity Service v2 running on http://localhost:${PORT}`);
+    logger.info(`Swagger docs: http://localhost:${PORT}/api-docs`);
     logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
     logger.info('Endpoints:');
     logger.info('  POST   /auth/register');

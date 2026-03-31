@@ -1,4 +1,3 @@
-// src/index.js — Analytics & Monitoring Service
 require('dotenv').config();
 
 const express = require('express');
@@ -26,6 +25,11 @@ app.use(cors({
 }))
 app.use(express.json());
 app.use(morgan('combined', { stream: { write: (msg) => logger.info(msg.trim()) } }));
+
+const swaggerUi = require('swagger-ui-express');
+const swaggerDocument = require('./swagger');
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // ─── Health Check ─────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
@@ -55,6 +59,7 @@ const start = async () => {
 
   app.listen(PORT, () => {
     logger.info(`Analytics Service v5 running on http://localhost:${PORT}`);
+    logger.info(`Swagger docs: http://localhost:${PORT}/api-docs`);
     logger.info('Endpoints (all require JWT):');
     logger.info('  GET  /analytics/response-times');
     logger.info('  GET  /analytics/incidents-by-region');
